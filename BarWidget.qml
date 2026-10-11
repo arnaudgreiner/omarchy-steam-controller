@@ -4,16 +4,20 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "i18n.js" as I18n
 
-// Widget de barre autonome : icône 🎮 + panneau de configuration des bindings.
-// Le panneau est un PopupCard ancré au widget (pattern du tray).
-// Le contenu est découpé en onglets (ButtonGroup) pour que le panneau tienne
-// sur un petit écran ; la liste des bindings est scrollable et bornée en hauteur.
+// Self-contained bar widget: 🎮 icon + binding configuration panel.
+// The panel is a PopupCard anchored to the widget (tray pattern).
+// Content is split into tabs (ButtonGroup) so the panel fits small
+// screens; the bindings list is scrollable and height-capped.
 BarWidget {
   id: root
   moduleName: "io.github.arnaudgreiner.steam-controller"
 
   readonly property string backendPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/" + root.moduleName + "/backend.py"
+
+  // UI language: English by default, French when the system locale is French.
+  readonly property string lang: Qt.locale().name.substring(0, 2)
 
   property bool controllerOn: false
   property bool daemonOn: false
@@ -32,7 +36,7 @@ BarWidget {
   // Onglet actif du panneau : "profile" ou "binding"
   property string activeTab: "profile"
 
-  // Retour utilisateur du panneau (messages de résultat)
+  // Panel feedback (result messages)
   property string feedback: ""
   property string pendingFeedback: ""
 
@@ -42,14 +46,14 @@ BarWidget {
   }
 
   readonly property var typeOptions: [
-    { value: "combo", label: "Combo clavier" },
-    { value: "app", label: "App (commande)" },
-    { value: "launch", label: "App (omarchy launch)" }
+    { value: "combo", label: I18n.t("typeCombo", root.lang) },
+    { value: "app", label: I18n.t("typeApp", root.lang) },
+    { value: "launch", label: I18n.t("typeLaunch", root.lang) }
   ]
 
   readonly property var tabOptions: [
-    { value: "profile", label: "Profil" },
-    { value: "binding", label: "Nouveau binding" }
+    { value: "profile", label: I18n.t("tabProfile", root.lang) },
+    { value: "binding", label: I18n.t("tabBinding", root.lang) }
   ]
 
   // Contrat open/close/opened pour la barre (summon/toggle par hotkey)
@@ -88,14 +92,16 @@ BarWidget {
     var newRows = []
     for (var i = 0; i < ins.length; i++) {
       var r = ins[i]
-      newRows.push({ id: r.input, label: r.label, desc: r.desc, bound: r.desc !== "—" && r.desc !== "" })
+      var lab = I18n.t("input." + r.input, root.lang)
+      if (lab === "input." + r.input) lab = r.label
+      newRows.push({ id: r.input, label: lab, desc: r.desc, bound: r.desc !== "—" && r.desc !== "" })
     }
     root.rows = newRows
   }
 
   function runSetProfile() {
     if (root.selectedProfile === "") return
-    root.pendingFeedback = "Profil activé : " + root.selectedProfile
+    root.pendingFeedback = I18n.t("fbProfileActivated", root.lang) + root.selectedProfile
     setProfileProc.command = ["python3", root.backendPath, "set-profile", root.selectedProfile]
     setProfileProc.running = true
   }
@@ -111,7 +117,9 @@ BarWidget {
     var newInputs = []
     for (var i = 0; i < ins.length; i++) {
       var id = ins[i]
-      newInputs.push({ value: id, label: (labels[id] || id) })
+      var lab = I18n.t("input." + id, root.lang)
+      if (lab === "input." + id) lab = (labels[id] || id)
+      newInputs.push({ value: id, label: lab })
     }
     root.inputs = newInputs
   }
@@ -121,24 +129,24 @@ BarWidget {
     var v = valueField.text.trim()
     if (root.selectedType === "combo") {
       args = args.concat(v.split(/\s+/).filter(function(x) { return x !== "" }))
-      if (args.length <= 5) { root.feedback = "Valeur manquante (ex : super c)"; return }
+      if (args.length <= 5) { root.feedback = I18n.t("fbMissingCombo", root.lang); return }
     } else {
-      if (v === "") { root.feedback = "Valeur manquante (ex : firefox)"; return }
+      if (v === "") { root.feedback = I18n.t("fbMissingValue", root.lang); return }
       args.push(v)
     }
-    root.pendingFeedback = "Enregistré et appliqué : " + root.selectedInput + " → " + v
+    root.pendingFeedback = I18n.t("fbSaved", root.lang) + root.selectedInput + " → " + v
     bindProc.command = args
     bindProc.running = true
   }
 
   function runClear() {
-    root.pendingFeedback = "Binding retiré : " + root.selectedInput
+    root.pendingFeedback = I18n.t("fbRemoved", root.lang) + root.selectedInput
     bindProc.command = ["python3", root.backendPath, "bind", root.selectedInput, "clear"]
     bindProc.running = true
   }
 
   function runApply() {
-    root.pendingFeedback = "Profil Omarchy appliqué"
+    root.pendingFeedback = I18n.t("fbApplied", root.lang)
     applyProc.running = true
   }
 
@@ -191,7 +199,7 @@ BarWidget {
         if (text.indexOf("OK") === 0) {
           applyProc.running = true
         } else {
-          root.feedback = "Erreur d'enregistrement : " + (text || "(réponse vide)")
+          root.feedback = I18n.t("fbSaveError", root.lang) + (text || "")
           root.refresh()
         }
       }
@@ -205,7 +213,7 @@ BarWidget {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        root.feedback = text.indexOf("OK") === 0 ? root.pendingFeedback : "Erreur d'application du profil"
+        root.feedback = text.indexOf("OK") === 0 ? root.pendingFeedback : I18n.t("fbApplyError", root.lang)
         root.pendingFeedback = ""
       }
     }
@@ -218,7 +226,7 @@ BarWidget {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        root.feedback = text.indexOf("OK") === 0 ? root.pendingFeedback : "Erreur : " + (text || "échec")
+        root.feedback = text.indexOf("OK") === 0 ? root.pendingFeedback : I18n.t("fbError", root.lang) + (text || "")
         root.pendingFeedback = ""
       }
     }
@@ -240,8 +248,8 @@ BarWidget {
     text: "🎮"
     dimmed: !root.controllerOn
     tooltipText: root.controllerOn
-      ? "Steam Controller connecté (profil Omarchy)"
-      : (root.daemonOn ? "Steam Controller non connecté" : "Daemon sc-controller arrêté")
+      ? I18n.t("statusConnected", root.lang)
+      : (root.daemonOn ? I18n.t("statusDisconnected", root.lang) : I18n.t("statusDaemonOff", root.lang))
     onPressed: function(b) { root.panelOpen = !root.panelOpen }
   }
 
@@ -260,7 +268,7 @@ BarWidget {
       spacing: Style.spacing.controlGap
 
       Text {
-        text: root.status.controller ? "🎮 Manette connectée" : "🎮 Manette non connectée"
+        text: root.status.controller ? I18n.t("controllerConnected", root.lang) : I18n.t("controllerDisconnected", root.lang)
         color: root.status.controller ? Color.accent : Color.foreground
         font.family: Style.font.family
         font.pixelSize: Style.font.body
@@ -290,14 +298,14 @@ BarWidget {
         Dropdown {
           id: profileDropdown
           width: parent.width
-          label: "Profil actif"
+          label: I18n.t("activeProfile", root.lang)
           value: root.selectedProfile
           options: root.profileList
           onChanged: function(v) { root.selectedProfile = v; root.refreshProfileInputs() }
         }
 
         Button {
-          text: "Activer le profil"
+          text: I18n.t("applyProfile", root.lang)
           onClicked: root.runSetProfile()
         }
 
@@ -308,14 +316,14 @@ BarWidget {
         }
 
         Text {
-          text: "Bindings du profil"
+          text: I18n.t("profileBindings", root.lang)
           color: Color.foreground
           font.family: Style.font.family
           font.pixelSize: Style.font.body
           font.bold: true
         }
 
-        // Liste bornée en hauteur et scrollable : le panneau tient sur petit écran.
+        // Height-capped scrollable list: the panel fits small screens.
         ListView {
           id: bindingsList
           width: parent.width
@@ -358,7 +366,7 @@ BarWidget {
         Dropdown {
           id: inputDropdown
           width: parent.width
-          label: "Input"
+          label: I18n.t("inputLabel", root.lang)
           value: root.selectedInput
           options: root.inputs
           onChanged: function(v) { root.selectedInput = v }
@@ -367,7 +375,7 @@ BarWidget {
         Dropdown {
           id: typeDropdown
           width: parent.width
-          label: "Action"
+          label: I18n.t("actionLabel", root.lang)
           value: root.selectedType
           options: root.typeOptions
           onChanged: function(v) { root.selectedType = v }
@@ -377,19 +385,19 @@ BarWidget {
           id: valueField
           width: parent.width
           placeholderText: root.selectedType === "combo"
-            ? "ex : super c  (touches séparées par des espaces)"
-            : (root.selectedType === "app" ? "ex : firefox" : "ex : browser")
+            ? I18n.t("placeholderCombo", root.lang)
+            : (root.selectedType === "app" ? I18n.t("placeholderApp", root.lang) : I18n.t("placeholderLaunch", root.lang))
         }
 
         Row {
           width: parent.width
           spacing: Style.spacing.controlGap
           Button {
-            text: "Enregistrer"
+            text: I18n.t("save", root.lang)
             onClicked: root.runSave()
           }
           Button {
-            text: "Effacer"
+            text: I18n.t("clear", root.lang)
             onClicked: root.runClear()
           }
         }
@@ -415,15 +423,15 @@ BarWidget {
         width: parent.width
         spacing: Style.spacing.controlGap
         Button {
-          text: "Appliquer"
+          text: I18n.t("apply", root.lang)
           onClicked: root.runApply()
         }
         Button {
-          text: "Relancer daemon"
+          text: I18n.t("restartDaemon", root.lang)
           onClicked: daemonProc.running = true
         }
         Button {
-          text: "Fermer"
+          text: I18n.t("close", root.lang)
           onClicked: root.close()
         }
       }

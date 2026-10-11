@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Backend du plugin Omarchy Steam Controller.
+"""Omarchy Steam Controller plugin backend.
 
-Gère les bindings de la manette en mode desktop :
-  - lit/écrit ~/.config/omarchy/steam-controller/bindings.json
-  - génère un profil sc-controller (~/.config/scc/profiles/Omarchy.sccprofile)
-  - applique le profil via `scc set-profile Omarchy`
+Manages desktop-mode bindings for the controller:
+  - reads/writes ~/.config/omarchy/steam-controller/bindings.json
+  - generates an sc-controller profile (~/.config/scc/profiles/Omarchy.sccprofile)
+  - applies the profile with `scc set-profile Omarchy`
 
-Actions supportées :
-  combo <KEY1 KEY2 ...>   -> boutons clavier simultanés (ex: Super C)
-  app <commande>          -> lance une commande shell brute
-  launch <app>            -> lance via `omarchy launch <app>`
+Supported binding types:
+  combo <KEY1 KEY2 ...>   -> simultaneous key presses (e.g. Super C)
+  app <command>           -> runs a raw shell command
+  launch <app>            -> runs `omarchy launch <app>`
 
-Usage :
+Usage:
   backend.py status
   backend.py list-inputs
   backend.py list-keys
   backend.py get
   backend.py bind <input> combo <KEY1> [KEY2 ...]
-  backend.py bind <input> app <commande...>
+  backend.py bind <input> app <command...>
   backend.py bind <input> launch <app>
   backend.py bind <input> clear
   backend.py apply
@@ -38,7 +38,7 @@ SCC_PROFILES_DIR = os.path.join(HOME, ".config", "scc", "profiles")
 PROFILE_NAME = "Omarchy"
 PROFILE_FILE = os.path.join(SCC_PROFILES_DIR, PROFILE_NAME + ".sccprofile")
 
-# Boutons exposés pour le binding (clés JSON du profil sc-controller).
+# Buttons exposed for binding (JSON keys of the sc-controller profile).
 INPUTS = [
     "A", "B", "X", "Y",
     "LB", "RB",
@@ -51,12 +51,12 @@ INPUTS = [
 
 INPUT_LABELS = {
     "A": "A", "B": "B", "X": "X", "Y": "Y",
-    "LB": "Gâchette gauche (bumper)", "RB": "Gâchette droite (bumper)",
-    "BACK": "Retour", "START": "Start", "C": "Bouton Steam",
-    "LPAD": "Appui pad gauche", "RPAD": "Appui pad droit",
-    "LGRIP": "Poignée gauche", "RGRIP": "Poignée droite",
-    "LT": "Trigger gauche", "RT": "Trigger droit",
-    "LSTICKPRESS": "Appui stick gauche", "RSTICKPRESS": "Appui stick droit",
+    "LB": "Left bumper", "RB": "Right bumper",
+    "BACK": "Back", "START": "Start", "C": "Steam button",
+    "LPAD": "Left pad press", "RPAD": "Right pad press",
+    "LGRIP": "Left grip", "RGRIP": "Right grip",
+    "LT": "Left trigger", "RT": "Right trigger",
+    "LSTICKPRESS": "Left stick press", "RSTICKPRESS": "Right stick press",
 }
 
 # Noms conviviaux -> constantes Keys du parseur sc-controller.
@@ -95,14 +95,14 @@ KEY_DISPLAY = {
     "KEY_LEFTCTRL": "Ctrl", "KEY_RIGHTCTRL": "Ctrl(D)",
     "KEY_LEFTSHIFT": "Shift", "KEY_RIGHTSHIFT": "Shift(D)",
     "KEY_LEFTALT": "Alt", "KEY_RIGHTALT": "AltGr",
-    "KEY_ENTER": "Entrée", "KEY_ESC": "Échap",
-    "KEY_SPACE": "Espace", "KEY_TAB": "Tab",
+    "KEY_ENTER": "Enter", "KEY_ESC": "Esc",
+    "KEY_SPACE": "Space", "KEY_TAB": "Tab",
     "KEY_BACKSPACE": "Backspace",
     "KEY_UP": "↑", "KEY_DOWN": "↓", "KEY_LEFT": "←", "KEY_RIGHT": "→",
-    "KEY_HOME": "Home", "KEY_END": "Fin",
+    "KEY_HOME": "Home", "KEY_END": "End",
     "KEY_PAGEUP": "PgUp", "KEY_PAGEDOWN": "PgDn",
-    "KEY_DELETE": "Suppr", "KEY_INSERT": "Inser",
-    "KEY_CAPSLOCK": "VerrMaj", "KEY_NUMLOCK": "VerrNum",
+    "KEY_DELETE": "Del", "KEY_INSERT": "Ins",
+    "KEY_CAPSLOCK": "CapsLock", "KEY_NUMLOCK": "NumLock",
     "KEY_MINUS": "-", "KEY_EQUAL": "=", "KEY_COMMA": ",",
     "KEY_DOT": ".", "KEY_SLASH": "/", "KEY_SEMICOLON": ";",
     "KEY_APOSTROPHE": "'", "KEY_GRAVE": "`", "KEY_BACKSLASH": "\\",
@@ -128,23 +128,23 @@ def describe_action(action):
     if m:
         return "Cmd: " + m.group(1)
     if "REL_WHEEL" in action or "REL_HWHEEL" in action:
-        return "Molette (scroll)"
+        return "Scroll wheel"
     if "dpad(" in action:
         return "D-pad"
     keys = re.findall(r"Keys\.(KEY_[A-Z0-9_]+|BTN_[A-Z0-9_]+)", action)
     if keys:
         return " + ".join(key_display(k) for k in keys)
     if "menu(" in action:
-        return "Menu OSD"
+        return "OSD menu"
     if "mouse(" in action:
-        return "Souris"
+        return "Mouse"
     if "keyboard()" in action:
-        return "Clavier"
+        return "Keyboard"
     if "turnoff()" in action:
-        return "Extinction"
+        return "Power off"
     return action.strip()[:50]
 
-# Profil de base : Desktop corrigé (sans haptique gauche défaillant).
+# Base profile: fixed Desktop (without the failing left haptics).
 BASE_PROFILE = {
     "_": "",
     "buttons": {
@@ -212,23 +212,23 @@ def action_for(binding):
         for tok in binding.get("keys", []):
             k = resolve_key(tok)
             if k is None:
-                raise ValueError("Clé inconnue : %s" % tok)
+                raise ValueError("Unknown key: %s" % tok)
             keys.append(k)
         if not keys:
-            raise ValueError("Combinaison vide")
+            raise ValueError("Empty combo")
         parts = ["button(Keys.%s)" % k for k in keys]
         return " and ".join(parts)
     if t == "app":
         cmd = binding.get("command", "")
         if not cmd:
-            raise ValueError("Commande vide")
+            raise ValueError("Missing command")
         return "shell(%s)" % json.dumps(cmd)
     if t == "launch":
         app = binding.get("app", "")
         if not app:
-            raise ValueError("App vide")
+            raise ValueError("Missing app")
         return "shell(%s)" % json.dumps("omarchy launch %s" % app)
-    raise ValueError("Type inconnu : %s" % t)
+    raise ValueError("Unknown type: %s" % t)
 
 
 def generate_profile():
@@ -319,21 +319,21 @@ def cmd_set_profile(args):
 
 PROFILE_INPUT_ORDER = [
     ("A", "A"), ("B", "B"), ("X", "X"), ("Y", "Y"),
-    ("LB", "Bumper gauche"), ("RB", "Bumper droit"),
-    ("BACK", "Retour"), ("START", "Start"), ("C", "Bouton Steam"),
-    ("LPAD", "Appui pad gauche"), ("RPAD", "Appui pad droit"),
-    ("LGRIP", "Poignée gauche"), ("RGRIP", "Poignée droite"),
-    ("LT", "Trigger gauche"), ("RT", "Trigger droit"),
-    ("LSTICKPRESS", "Appui stick gauche"), ("RSTICKPRESS", "Appui stick droit"),
+    ("LB", "Left bumper"), ("RB", "Right bumper"),
+    ("BACK", "Back"), ("START", "Start"), ("C", "Steam button"),
+    ("LPAD", "Left pad press"), ("RPAD", "Right pad press"),
+    ("LGRIP", "Left grip"), ("RGRIP", "Right grip"),
+    ("LT", "Left trigger"), ("RT", "Right trigger"),
+    ("LSTICKPRESS", "Left stick press"), ("RSTICKPRESS", "Right stick press"),
 ]
 
 EXTRA_INPUT_ORDER = [
-    ("pad_left", "Pad gauche (toucher)"),
-    ("pad_right", "Pad droit (toucher)"),
-    ("lstick", "Stick gauche"),
-    ("rstick", "Stick droit"),
-    ("trigger_left", "Trigger gauche"),
-    ("trigger_right", "Trigger droit"),
+    ("pad_left", "Left pad (touch)"),
+    ("pad_right", "Right pad (touch)"),
+    ("lstick", "Left stick"),
+    ("rstick", "Right stick"),
+    ("trigger_left", "Left trigger (analog)"),
+    ("trigger_right", "Right trigger (analog)"),
 ]
 
 
@@ -352,13 +352,13 @@ def cmd_profile_inputs(args):
     name = args[0]
     path = find_profile_file(name)
     if not path:
-        sys.stderr.write("Profil inconnu : %s\n" % name)
+        sys.stderr.write("Unknown profile: %s\n" % name)
         return 1
     try:
         with open(path) as f:
             data = json.load(f)
     except Exception as e:
-        sys.stderr.write("Lecture échouée : %s\n" % e)
+        sys.stderr.write("Read failed: %s\n" % e)
         return 1
     rows = []
     buttons = data.get("buttons", {})
@@ -408,7 +408,7 @@ def cmd_bind(args):
         return 2
     inp = args[0].upper()
     if inp not in INPUTS:
-        sys.stderr.write("Input inconnu : %s\n" % inp)
+        sys.stderr.write("Unknown input: %s\n" % inp)
         return 1
     data = load_bindings()
     bindings = data.setdefault("bindings", {})
@@ -425,23 +425,23 @@ def cmd_bind(args):
         tokens = args[2:]
         for t in tokens:
             if resolve_key(t) is None:
-                sys.stderr.write("Clé inconnue : %s\n" % t)
+                sys.stderr.write("Unknown key: %s\n" % t)
                 return 1
         bindings[inp] = {"type": "combo", "keys": tokens}
     elif kind == "app":
         cmd = " ".join(args[2:])
         if not cmd:
-            sys.stderr.write("Commande manquante\n")
+            sys.stderr.write("Missing command\n")
             return 1
         bindings[inp] = {"type": "app", "command": cmd}
     elif kind == "launch":
         app = " ".join(args[2:])
         if not app:
-            sys.stderr.write("App manquante\n")
+            sys.stderr.write("Missing app\n")
             return 1
         bindings[inp] = {"type": "launch", "app": app}
     else:
-        sys.stderr.write("Type inconnu : %s\n" % kind)
+        sys.stderr.write("Unknown type: %s\n" % kind)
         return 1
     save_bindings(data)
     print("OK bind %s -> %s" % (inp, json.dumps(bindings[inp], ensure_ascii=False)))
@@ -452,14 +452,14 @@ def cmd_apply():
     try:
         profile, errors = generate_profile()
     except Exception as e:
-        sys.stderr.write("Génération échouée : %s\n" % e)
+        sys.stderr.write("Generation failed: %s\n" % e)
         return 1
     rc, output = apply_profile()
     if errors:
         for e in errors:
-            sys.stderr.write("Attention : %s\n" % e)
+            sys.stderr.write("Warning: %s\n" % e)
     if rc == 0:
-        print("OK profile %s appliqué (%s)" % (PROFILE_NAME, PROFILE_FILE))
+        print("OK profile %s applied (%s)" % (PROFILE_NAME, PROFILE_FILE))
         return 0
     sys.stderr.write(output)
     return 1
@@ -493,11 +493,11 @@ def main():
         try:
             profile, errors = generate_profile()
             for e in errors:
-                sys.stderr.write("Attention : %s\n" % e)
+                sys.stderr.write("Warning: %s\n" % e)
             print(PROFILE_FILE)
             return 0
         except Exception as e:
-            sys.stderr.write("Erreur : %s\n" % e)
+            sys.stderr.write("Error: %s\n" % e)
             return 1
     else:
         sys.stderr.write("Commande inconnue : %s\n" % cmd)

@@ -69,6 +69,11 @@ digits `0-9`, `f1`-`f12`, `enter`, `space`, `tab`, `esc`, arrows, `home`,
 `end`, `pageup`/`pagedown`, `delete`, `insert`, `backspace`, punctuation, or
 raw `KEY_*` names.
 
+## Languages
+
+The UI is in English and switches to French automatically when the system
+locale is French. Further languages can be added in `i18n.js`.
+
 ## Notes
 
 - The Steam button launches Steam. When Steam is running it takes over the
