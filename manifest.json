@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.arnaudgreiner.steam-controller",
+  "name": "Steam Controller",
+  "version": "1.0.0",
+  "author": "arnaudgreiner",
+  "license": "MIT",
+  "description": "Configure the Steam Controller desktop bindings (key combos, app launches) and switch profiles from an Omarchy bar widget, powered by sc-controller.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Steam Controller",
+    "description": "Status and desktop input configuration for the Steam Controller",
+    "category": "Input",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
