@@ -38,12 +38,15 @@ omarchy plugin enable io.github.arnaudgreiner.steam-controller --section right
 
 ## Usage
 
-1. Click the 🎮 icon in the bar to open the configuration panel.
-2. **Profile** — pick a profile and press *Activer le profil* (or just read
+1. Click the 🎮 icon in the bar to open the configuration panel. The panel is
+   split into two tabs so it fits on small screens, and the bindings list
+   scrolls when a profile has many bindings.
+2. **Profil** tab — pick a profile and press *Activer le profil* (or just read
    what is already bound in each profile).
-3. **Nouveau binding** — choose an input, an action type, and a value, then
+3. **Nouveau binding** tab — choose an input, an action type, and a value, then
    press *Enregistrer*.
-4. Press *Appliquer* to regenerate and activate the `Omarchy` profile.
+4. Press *Appliquer* (footer, always visible) to regenerate and activate the
+   `Omarchy` profile.
 
 The sc-controller daemon must be running for the controller to work. Pressing
 *Appliquer* starts it if needed. To start it automatically at login, add this

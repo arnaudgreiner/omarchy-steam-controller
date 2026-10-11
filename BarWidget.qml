@@ -7,6 +7,8 @@ import qs.Ui
 
 // Widget de barre autonome : icône 🎮 + panneau de configuration des bindings.
 // Le panneau est un PopupCard ancré au widget (pattern du tray).
+// Le contenu est découpé en onglets (ButtonGroup) pour que le panneau tienne
+// sur un petit écran ; la liste des bindings est scrollable et bornée en hauteur.
 BarWidget {
   id: root
   moduleName: "io.github.arnaudgreiner.steam-controller"
@@ -27,10 +29,18 @@ BarWidget {
   property string currentProfile: ""
   property string selectedProfile: ""
 
+  // Onglet actif du panneau : "profile" ou "binding"
+  property string activeTab: "profile"
+
   readonly property var typeOptions: [
     { value: "combo", label: "Combo clavier" },
     { value: "app", label: "App (commande)" },
     { value: "launch", label: "App (omarchy launch)" }
+  ]
+
+  readonly property var tabOptions: [
+    { value: "profile", label: "Profil" },
+    { value: "binding", label: "Nouveau binding" }
   ]
 
   // Contrat open/close/opened pour la barre (summon/toggle par hotkey)
@@ -222,40 +232,62 @@ BarWidget {
         color: Color.popups.border
       }
 
-      Text {
-        text: "Profil"
-        color: Color.foreground
-        font.family: Style.font.family
-        font.pixelSize: Style.font.body
-        font.bold: true
-      }
-
-      Dropdown {
-        id: profileDropdown
+      // Onglets : Profil (vue + liste des bindings) / Nouveau binding (formulaire)
+      ButtonGroup {
+        id: tabGroup
         width: parent.width
-        label: "Profil actif"
-        value: root.selectedProfile
-        options: root.profileList
-        onChanged: function(v) { root.selectedProfile = v; root.refreshProfileInputs() }
+        options: root.tabOptions
+        value: root.activeTab
+        onChanged: function(v) { root.activeTab = v }
       }
 
-      Button {
-        text: "Activer le profil"
-        onClicked: root.runSetProfile()
-      }
-
-      Rectangle {
-        width: parent.width
-        height: 1
-        color: Color.popups.border
-      }
-
+      // ---- Onglet Profil -------------------------------------------------
       Column {
         width: parent.width
-        Repeater {
+        spacing: Style.spacing.controlGap
+        visible: root.activeTab === "profile"
+
+        Dropdown {
+          id: profileDropdown
+          width: parent.width
+          label: "Profil actif"
+          value: root.selectedProfile
+          options: root.profileList
+          onChanged: function(v) { root.selectedProfile = v; root.refreshProfileInputs() }
+        }
+
+        Button {
+          text: "Activer le profil"
+          onClicked: root.runSetProfile()
+        }
+
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: Color.popups.border
+        }
+
+        Text {
+          text: "Bindings du profil"
+          color: Color.foreground
+          font.family: Style.font.family
+          font.pixelSize: Style.font.body
+          font.bold: true
+        }
+
+        // Liste bornée en hauteur et scrollable : le panneau tient sur petit écran.
+        ListView {
+          id: bindingsList
+          width: parent.width
+          height: Math.min(contentHeight, Style.space(300))
           model: root.rows
-          Row {
-            width: parent.width
+          clip: true
+          spacing: 0
+          boundsBehavior: Flickable.StopAtBounds
+
+          delegate: Row {
+            required property var modelData
+            width: bindingsList.width
             height: Style.spacing.controlHeight
             Text {
               width: 150
@@ -277,56 +309,49 @@ BarWidget {
         }
       }
 
-      Rectangle {
-        width: parent.width
-        height: 1
-        color: Color.popups.border
-      }
-
-      Text {
-        text: "Nouveau binding"
-        color: Color.foreground
-        font.family: Style.font.family
-        font.pixelSize: Style.font.body
-        font.bold: true
-      }
-
-      Dropdown {
-        id: inputDropdown
-        width: parent.width
-        label: "Input"
-        value: root.selectedInput
-        options: root.inputs
-        onChanged: function(v) { root.selectedInput = v }
-      }
-
-      Dropdown {
-        id: typeDropdown
-        width: parent.width
-        label: "Action"
-        value: root.selectedType
-        options: root.typeOptions
-        onChanged: function(v) { root.selectedType = v }
-      }
-
-      TextField {
-        id: valueField
-        width: parent.width
-        placeholderText: root.selectedType === "combo"
-          ? "ex : super c  (touches séparées par des espaces)"
-          : (root.selectedType === "app" ? "ex : firefox" : "ex : browser")
-      }
-
-      Row {
+      // ---- Onglet Nouveau binding ---------------------------------------
+      Column {
         width: parent.width
         spacing: Style.spacing.controlGap
-        Button {
-          text: "Enregistrer"
-          onClicked: root.runSave()
+        visible: root.activeTab === "binding"
+
+        Dropdown {
+          id: inputDropdown
+          width: parent.width
+          label: "Input"
+          value: root.selectedInput
+          options: root.inputs
+          onChanged: function(v) { root.selectedInput = v }
         }
-        Button {
-          text: "Effacer"
-          onClicked: root.runClear()
+
+        Dropdown {
+          id: typeDropdown
+          width: parent.width
+          label: "Action"
+          value: root.selectedType
+          options: root.typeOptions
+          onChanged: function(v) { root.selectedType = v }
+        }
+
+        TextField {
+          id: valueField
+          width: parent.width
+          placeholderText: root.selectedType === "combo"
+            ? "ex : super c  (touches séparées par des espaces)"
+            : (root.selectedType === "app" ? "ex : firefox" : "ex : browser")
+        }
+
+        Row {
+          width: parent.width
+          spacing: Style.spacing.controlGap
+          Button {
+            text: "Enregistrer"
+            onClicked: root.runSave()
+          }
+          Button {
+            text: "Effacer"
+            onClicked: root.runClear()
+          }
         }
       }
 
