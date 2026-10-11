@@ -32,6 +32,15 @@ BarWidget {
   // Onglet actif du panneau : "profile" ou "binding"
   property string activeTab: "profile"
 
+  // Retour utilisateur du panneau (messages de résultat)
+  property string feedback: ""
+  property string pendingFeedback: ""
+
+  onActiveTabChanged: {
+    root.feedback = ""
+    if (activeTab === "binding") Qt.callLater(function() { valueField.forceActiveFocus() })
+  }
+
   readonly property var typeOptions: [
     { value: "combo", label: "Combo clavier" },
     { value: "app", label: "App (commande)" },
@@ -86,6 +95,7 @@ BarWidget {
 
   function runSetProfile() {
     if (root.selectedProfile === "") return
+    root.pendingFeedback = "Profil activé : " + root.selectedProfile
     setProfileProc.command = ["python3", root.backendPath, "set-profile", root.selectedProfile]
     setProfileProc.running = true
   }
@@ -111,17 +121,25 @@ BarWidget {
     var v = valueField.text.trim()
     if (root.selectedType === "combo") {
       args = args.concat(v.split(/\s+/).filter(function(x) { return x !== "" }))
+      if (args.length <= 5) { root.feedback = "Valeur manquante (ex : super c)"; return }
     } else {
+      if (v === "") { root.feedback = "Valeur manquante (ex : firefox)"; return }
       args.push(v)
     }
-    if (root.selectedType === "combo" && args.length <= 5) return
+    root.pendingFeedback = "Enregistré et appliqué : " + root.selectedInput + " → " + v
     bindProc.command = args
     bindProc.running = true
   }
 
   function runClear() {
+    root.pendingFeedback = "Binding retiré : " + root.selectedInput
     bindProc.command = ["python3", root.backendPath, "bind", root.selectedInput, "clear"]
     bindProc.running = true
+  }
+
+  function runApply() {
+    root.pendingFeedback = "Profil Omarchy appliqué"
+    applyProc.running = true
   }
 
   Component.onCompleted: refresh()
@@ -163,25 +181,47 @@ BarWidget {
     }
   }
 
+  // Enregistrement -> puis application automatique au profil
   Process {
     id: bindProc
     command: []
-    onRunningChanged: if (!running) root.refresh()
-    stdout: StdioCollector { waitForEnd: true }
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        if (text.indexOf("OK") === 0) {
+          applyProc.running = true
+        } else {
+          root.feedback = "Erreur d'enregistrement : " + (text || "(réponse vide)")
+          root.refresh()
+        }
+      }
+    }
   }
 
   Process {
     id: applyProc
     command: ["python3", root.backendPath, "apply"]
     onRunningChanged: if (!running) root.refresh()
-    stdout: StdioCollector { waitForEnd: true }
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        root.feedback = text.indexOf("OK") === 0 ? root.pendingFeedback : "Erreur d'application du profil"
+        root.pendingFeedback = ""
+      }
+    }
   }
 
   Process {
     id: setProfileProc
     command: []
     onRunningChanged: if (!running) root.refresh()
-    stdout: StdioCollector { waitForEnd: true }
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        root.feedback = text.indexOf("OK") === 0 ? root.pendingFeedback : "Erreur : " + (text || "échec")
+        root.pendingFeedback = ""
+      }
+    }
   }
 
   Process {
@@ -361,12 +401,22 @@ BarWidget {
         color: Color.popups.border
       }
 
+      Text {
+        visible: root.feedback !== ""
+        width: parent.width
+        text: root.feedback
+        color: Color.accent
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+        wrapMode: Text.WordWrap
+      }
+
       Row {
         width: parent.width
         spacing: Style.spacing.controlGap
         Button {
           text: "Appliquer"
-          onClicked: applyProc.running = true
+          onClicked: root.runApply()
         }
         Button {
           text: "Relancer daemon"
